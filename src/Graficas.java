@@ -80,7 +80,7 @@ public class Graficas extends JPanel{
         g2.drawString("Diagrama de Gantt - FIFO", 150, 25);
     }
 
-    public static void mostrar(String rutaArchivo) {
+    public void mostrar(String rutaArchivo) {
         JFrame frame = new JFrame("Gantt Chart FIFO");
         frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         frame.add(new JScrollPane(new Graficas(rutaArchivo)));

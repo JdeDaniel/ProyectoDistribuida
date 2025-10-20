@@ -19,9 +19,15 @@ public class ManejoDeProcesos extends Thread {
 
     }
 
+    /*
     public synchronized void IngresarProceso(int Duracion, String Nombre, String Cliente){
         Proceso nuevoProceso = new Proceso(Duracion, Nombre, Cliente);
         Procesos.offer(nuevoProceso);
+    }
+    */
+
+    public void actualizarProcesos(Queue<Proceso> nuevosProcesos){
+        Procesos = nuevosProcesos;
     }
 
     //Metodo que se llamara cada quantum para actualizar los procesos en espera
@@ -31,6 +37,7 @@ public class ManejoDeProcesos extends Thread {
         }
         Proceso procesoActual = (Proceso) Procesos.poll(); //Obtenemos el proceso al frente de la cola
         if(QuantusPosibles - QuantusUsados > procesoActual.getDuracion()){ //Si hay espacio para el proceso entra a espera
+            System.out.println("Proceso " + procesoActual.getNombre() + " ha entrado en espera en el quantum " + QuantuActual);
             procesoActual.setCreacion(QuantuActual);
             EnEspera.offer(procesoActual);
             QuantusUsados += procesoActual.getDuracion();
@@ -47,13 +54,15 @@ public class ManejoDeProcesos extends Thread {
                 IntentoRechazo = 0; //Reiniciamos el contador
 
                 Proceso procesoRechazado = (Proceso) Rechazados.peek(); //Obtenemos el proceso rechazado al frente de la cola
-                if (QuantusPosibles - QuantusUsados > procesoRechazado.getDuracion()){ //Si hay espacio para el proceso entra a espera      
+                if (QuantusPosibles - QuantusUsados > procesoRechazado.getDuracion()){ //Si hay espacio para el proceso entra a espera 
+                    System.out.println("Proceso " + procesoRechazado.getNombre() + " ha entrado en espera en el quantum " + QuantuActual);     
                     procesoRechazado.setCreacion(QuantuActual);
                     EnEspera.offer(procesoRechazado);
                     QuantusUsados += procesoRechazado.getDuracion();
                     Rechazados.poll(); //Removemos el proceso de la cola de rechazados
                 }else{
                     if(procesoRechazado.getIntentos() >= 2){ //Si ya se ha intentado 3 veces se elimina el proceso
+                        System.out.println("Proceso " + procesoRechazado.getNombre() + " ha sido rechazado en el quantum " + QuantuActual);
                         Rechazados.poll();
                     } else {
                         procesoRechazado.subirIntentos(); //Aumentamos el contador de intentos del proceso
