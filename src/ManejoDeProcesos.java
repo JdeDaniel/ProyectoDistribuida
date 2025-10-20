@@ -3,10 +3,14 @@ import java.util.Queue;
 import java.io.FileWriter;
 import java.io.BufferedWriter;
 import java.io.File;
+import java.util.concurrent.ConcurrentLinkedQueue;
+
+
 
 public class ManejoDeProcesos extends Thread {
     
-    private static Queue<Proceso> EnEspera = new LinkedList<>();
+    //private static Queue<Proceso> EnEspera = new LinkedList<>();
+    private static Queue<Proceso> EnEspera = new ConcurrentLinkedQueue<>();
     private static Queue<Proceso> Rechazados = new LinkedList<>();
     private static Queue <Proceso> Procesos = new LinkedList<>();
     //private Queue <Proceso> Ejecucion = new LinkedList<>();
@@ -36,13 +40,14 @@ public class ManejoDeProcesos extends Thread {
             return;
         }
         Proceso procesoActual = (Proceso) Procesos.poll(); //Obtenemos el proceso al frente de la cola
-        if(QuantusPosibles - QuantusUsados > procesoActual.getDuracion()){ //Si hay espacio para el proceso entra a espera
+        if(QuantusPosibles - QuantusUsados >= procesoActual.getDuracion()){ //Si hay espacio para el proceso entra a espera
             System.out.println("Proceso " + procesoActual.getNombre() + " ha entrado en espera en el quantum " + QuantuActual);
             procesoActual.setCreacion(QuantuActual);
             EnEspera.offer(procesoActual);
             QuantusUsados += procesoActual.getDuracion();
-        } else { //Si no hay espacio se rechaza el proceso
-            Rechazados.offer(Procesos.poll());
+        } else { //Si no hay espacio se rechaza el 
+            System.out.println("Proceso " + procesoActual.getNombre() + " ha sido rechazado en el quantum " + QuantuActual);
+            Rechazados.offer(procesoActual);
         }
     }
 
@@ -61,7 +66,7 @@ public class ManejoDeProcesos extends Thread {
                     QuantusUsados += procesoRechazado.getDuracion();
                     Rechazados.poll(); //Removemos el proceso de la cola de rechazados
                 }else{
-                    if(procesoRechazado.getIntentos() >= 2){ //Si ya se ha intentado 3 veces se elimina el proceso
+                    if(procesoRechazado.getIntentos() >= 3){ //Si ya se ha intentado 3 veces se elimina el proceso
                         System.out.println("Proceso " + procesoRechazado.getNombre() + " ha sido rechazado en el quantum " + QuantuActual);
                         Rechazados.poll();
                     } else {
@@ -74,23 +79,29 @@ public class ManejoDeProcesos extends Thread {
     
     //Metodo que se llamara cada quantum para actualizar el avance de los procesos en Ejecucion
     public void Ejecucion(){
+        if(QuantusUsados > 0){
+            System.out.println("Quantum " + QuantuActual + " en ejecucion. Quantus usados: " + QuantusUsados);
+            QuantusUsados -= 1; //Reducimos el uso de quantus por el proceso en ejecucion
+        }
+
         if(EnEspera.isEmpty()){ //No hay procesos en espera
             return;
         }
 
-        if(QuantusUsados > 0){
-            QuantusUsados -= 1; //Reducimos el uso de quantus por el proceso en ejecucion
-        }
-
         Proceso procesoEjecucion = (Proceso) EnEspera.peek(); //Obtenemos el proceso al frente de la cola
-
+        if(procesoEjecucion.getEnEspera() != null){
+            System.out.println("Ejecutando proceso: " + procesoEjecucion.getNombre() + ", Duracion restante: " + (procesoEjecucion.getDuracion() - (QuantuActual - procesoEjecucion.getEnEspera() + procesoEjecucion.getCreacion())) );
+        }
+        
         if (procesoEjecucion.getEnEspera() == null){  //Si es la primera vez que se ejecuta el proceso 
+            System.out.println("Proceso " + procesoEjecucion.getNombre() + " ha comenzado su ejecucion en el quantum " + QuantuActual);
             procesoEjecucion.setEnEspera(QuantuActual - procesoEjecucion.getCreacion()); //Calculamos el tiempo en espera
 
-        }else if(procesoEjecucion.getDuracion() == (QuantuActual - procesoEjecucion.getEnEspera())){ //Si el proceso ha terminado su duracion
-
+        }
+        //System.out.println("Tiempo de ejecucion del proceso " + procesoEjecucion.getNombre() + ": " + (QuantuActual - (procesoEjecucion.getEnEspera() + procesoEjecucion.getCreacion())));
+        if(procesoEjecucion.getEnEspera() != null && (procesoEjecucion.getDuracion() == (QuantuActual - (procesoEjecucion.getEnEspera() + procesoEjecucion.getCreacion())))){ //Si el proceso ha terminado su duracion
+            System.out.println("Proceso " + procesoEjecucion.getNombre() + " ha terminado su ejecucion en el quantum " + QuantuActual);
             Terminado(procesoEjecucion);
-
         }
 
     }
@@ -99,6 +110,7 @@ public class ManejoDeProcesos extends Thread {
     public void Terminado(Proceso procesoFinalizado){
         procesoFinalizado.setFinalizacion(QuantuActual); //Calculamos el tiempo de finalizacion
         procesoFinalizado.setPenalizacion(procesoFinalizado.getFinalizacion()  / procesoFinalizado.getDuracion()); //Calculamos la penalizacion
+        System.out.println("Proceso " + procesoFinalizado.getNombre() + " ha terminado en el quantum " + QuantuActual);
         String ruta = procesoFinalizado.getCliente() + "_procesos.txt"; // Ruta del archivo para el cliente
         
         try (BufferedWriter writer = new BufferedWriter(new FileWriter(ruta, true))) { // Escribimos el proceso en el archivo

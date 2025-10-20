@@ -40,7 +40,7 @@ public class Cliente {
                 }
                 ProcesoID++;
                 String NombreProceso = "Proceso" + ProcesoID;
-                int Duracion = (int) (Math.random() * 10) + 1; // Duración aleatoria entre 1 y 10
+                int Duracion = (int) (Math.random() * 5) + 1; // Duración aleatoria entre 1 y 10
                 System.out.println("Enviando " + NombreProceso + " con duración " + Duracion + " al servidor...");
                 Object[] params = new Object[]{Duracion, NombreProceso, NombreCliente}; // Parámetros para el método remoto
                 client.execute("Manejador.IngresarProceso", Arrays.asList(params)); // Llamada al método remoto
