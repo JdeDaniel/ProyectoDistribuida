@@ -26,8 +26,8 @@ public class Graficas extends JPanel{
                     String nombre = partes[0].split(":")[1].trim();
                     int duracion = Integer.parseInt(partes[1].split(":")[1].trim());
                     int creacion = Integer.parseInt(partes[2].split(":")[1].trim());
-                    int finalizacion = Integer.parseInt(partes[4].split(":")[1].trim());
-                    int inicio = finalizacion - duracion;
+                    int finalizacion = Integer.parseInt(partes[5].split(":")[1].trim());
+                    int inicio = Integer.parseInt(partes[4].split(":")[1].trim());
                     Proceso nuevo = new Proceso(duracion, nombre, "\0");
                     nuevo.setFinalizacion(finalizacion);
                     nuevo.setCreacion(creacion);

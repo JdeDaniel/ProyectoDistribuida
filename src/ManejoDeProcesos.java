@@ -95,6 +95,7 @@ public class ManejoDeProcesos extends Thread {
         
         if (procesoEjecucion.getEnEspera() == null){  //Si es la primera vez que se ejecuta el proceso 
             System.out.println("Proceso " + procesoEjecucion.getNombre() + " ha comenzado su ejecucion en el quantum " + QuantuActual);
+            procesoEjecucion.setInicio(QuantuActual);
             procesoEjecucion.setEnEspera(QuantuActual - procesoEjecucion.getCreacion()); //Calculamos el tiempo en espera
 
         }
@@ -114,7 +115,7 @@ public class ManejoDeProcesos extends Thread {
         String ruta = procesoFinalizado.getCliente() + "_procesos.txt"; // Ruta del archivo para el cliente
         
         try (BufferedWriter writer = new BufferedWriter(new FileWriter(ruta, true))) { // Escribimos el proceso en el archivo
-            writer.write("Proceso: " + procesoFinalizado.getNombre() + ", Duracion: " + procesoFinalizado.getDuracion() + ", Creacion: " + procesoFinalizado.getCreacion() + ", En Espera: " + procesoFinalizado.getEnEspera() + ", Finalizacion: " + procesoFinalizado.getFinalizacion() + ", Penalizacion: " + procesoFinalizado.getPenalizacion() + "\n");
+            writer.write("Proceso: " + procesoFinalizado.getNombre() + ", Duracion: " + procesoFinalizado.getDuracion() + ", Creacion: " + procesoFinalizado.getCreacion() + ", En Espera: " + procesoFinalizado.getEnEspera()+ ", Inicio: " + procesoFinalizado.getInicio() + ", Finalizacion: " + procesoFinalizado.getFinalizacion() + ", Penalizacion: " + procesoFinalizado.getPenalizacion() + "\n");
             writer.flush();
             writer.close();
         } catch (Exception e) {
@@ -133,7 +134,7 @@ public class ManejoDeProcesos extends Thread {
         }
 
         try (BufferedWriter writer = new BufferedWriter(new FileWriter(ruta, true))) { // Escribimos el proceso en el archivo general
-            writer.write("Proceso: " + procesoFinalizado.getCliente() + "_" + procesoFinalizado.getNombre() + ", Duracion: " + procesoFinalizado.getDuracion() + ", Creacion: " + procesoFinalizado.getCreacion() + ", En Espera: " + procesoFinalizado.getEnEspera() + ", Finalizacion: " + procesoFinalizado.getFinalizacion() + ", Penalizacion: " + procesoFinalizado.getPenalizacion() + "\n");
+            writer.write("Proceso: " + procesoFinalizado.getCliente() + "_" + procesoFinalizado.getNombre() + ", Duracion: " + procesoFinalizado.getDuracion() + ", Creacion: " + procesoFinalizado.getCreacion() + ", En Espera: " + procesoFinalizado.getEnEspera() + ", Inicio: " + procesoFinalizado.getInicio() + ", Finalizacion: " + procesoFinalizado.getFinalizacion() + ", Penalizacion: " + procesoFinalizado.getPenalizacion() + "\n");
             writer.flush();
             writer.close();
         } catch (Exception e) {
