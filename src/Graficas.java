@@ -7,7 +7,7 @@ import java.util.List;
 public class Graficas extends JPanel{
     private List<Proceso> procesos = new ArrayList<>();
     private static final int ALTURA_BARRA = 40;
-    private static final int MARGEN_IZQ = 60;
+    private static final int MARGEN_IZQ = 100;
     private static final int MARGEN_SUP = 50;
     private static final int ESCALA_TIEMPO = 30; // píxeles por unidad de tiempo
 
@@ -54,9 +54,9 @@ public class Graficas extends JPanel{
 
         // Dibujar ejes de tiempo
         g2.setColor(Color.GRAY);
-        for (int t = 0; t <= 30; t++) {
+        for (int t = 0; t <= 45; t++) {
             int x = MARGEN_IZQ + t * ESCALA_TIEMPO;
-            g2.drawLine(x, MARGEN_SUP - 10, x, getHeight() - 20);
+            g2.drawLine(x, MARGEN_SUP - 10, x, (getHeight()/2));
             g2.drawString(String.valueOf(t), x - 5, MARGEN_SUP - 15);
         }
 
@@ -76,16 +76,16 @@ public class Graficas extends JPanel{
         }
 
         // Título
-        g2.setFont(new Font("SansSerif", Font.BOLD, 18));
-        g2.drawString("Diagrama de Gantt - FIFO", 150, 25);
+        g2.setFont(new Font("Procesos", Font.BOLD, 18));
+        g2.drawString("Diagrama FIFO", 150, 25);
     }
 
     public void mostrar(String rutaArchivo) {
-        JFrame frame = new JFrame("Gantt Chart FIFO");
+        JFrame frame = new JFrame("FIFO");
         frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         frame.add(new JScrollPane(new Graficas(rutaArchivo)));
         frame.pack();
-        frame.setLocationRelativeTo(null);
+        frame.setExtendedState(JFrame.MAXIMIZED_BOTH);
         frame.setVisible(true);
     }
 }

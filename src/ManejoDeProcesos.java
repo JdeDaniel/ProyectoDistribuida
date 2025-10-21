@@ -149,13 +149,13 @@ public class ManejoDeProcesos extends Thread {
         while(true){
             try {
                 Thread.sleep(2000); //Simulamos un quantum de 1 segundo
-                QuantuActual += 1; //Aumentamos el contador de quantums
                 Espera(); //Llamamos al metodo de espera
                 Thread.sleep(500); //Pequeña pausa para simular el tiempo entre metodos
                 Rechazo(); //Llamamos al metodo de rechazo
                 Thread.sleep(500); //Pequeña pausa para simular el tiempo entre metodos
                 Ejecucion(); //Llamamos al metodo de ejecucion
                 Thread.sleep(500); //Pequeña pausa para simular el tiempo entre metodos
+                QuantuActual += 1; //Aumentamos el contador de quantums
             } catch (InterruptedException e) {
                 e.printStackTrace();
             }
