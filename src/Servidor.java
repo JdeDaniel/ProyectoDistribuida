@@ -56,12 +56,17 @@ public class Servidor {
             xmlRpcServer.setHandlerMapping(phm);
 
             // Opcional: deja SOLO uno, hook o finally. Mantengo finally y comento hook.
-            // WebServer finalWeb = webServer;
+            WebServer finalWeb = webServer;
             // Runtime.getRuntime().addShutdownHook(new Thread(() -> cierreLimpio(finalWeb, null)));
-
+            
+            limpiarArchivos();
+            
             webServer.start();
             System.out.println("Servidor iniciado. Esperando peticiones…");
-
+            
+            
+            
+            
             boolean loop = true;
             while (loop) {
                 try {
@@ -70,6 +75,8 @@ public class Servidor {
                     switch (opcion) {
                         case 1 -> {
                             String ruta = "Todos_procesos.txt";
+                            
+                            
                             SwingUtilities.invokeLater(() -> Graficas.mostrar(ruta));
                             esperarEnter(sc, "Pulsa ENTER para volver al menú...");
                         }
@@ -112,4 +119,9 @@ public class Servidor {
         System.out.print(msg);
         sc.nextLine();
     }
+    
+    private static void limpiarArchivos() {
+    new File("Todos_procesos.txt").delete();
+    for (String c : clientesRegistrados) new File(c + "_procesos.txt").delete();
+}
 }

@@ -1,4 +1,3 @@
-Proceso: Proceso 1, Duracion: 6, Creacion: 0, En Espera: 0, Inicio: 0, Finalizacion: 6, Penalizacion: 1.00, Cliente: miriam
-Proceso: Proceso 3, Duracion: 4, Creacion: 2, En Espera: 5, Inicio: 7, Finalizacion: 9, Penalizacion: 2.25, Cliente: miriam
-Proceso: Proceso 2, Duracion: 7, Creacion: 12, En Espera: 0, Inicio: 12, Finalizacion: 7, Penalizacion: 1.00, Cliente: miriam
-Proceso: Proceso 4, Duracion: 4, Creacion: 21, En Espera: 0, Inicio: 21, Finalizacion: 4, Penalizacion: 1.00, Cliente: miriam
+Proceso: Proceso 1, Duracion: 4, Creacion: 0, En Espera: 0, Inicio: 0, Finalizacion: 4, Penalizacion: 1.00, Cliente: miriam
+Proceso: Proceso 2, Duracion: 4, Creacion: 0, En Espera: 4, Inicio: 4, Finalizacion: 8, Penalizacion: 2.00, Cliente: miriam
+Proceso: Proceso 3, Duracion: 6, Creacion: 5, En Espera: 3, Inicio: 8, Finalizacion: 9, Penalizacion: 1.50, Cliente: miriam

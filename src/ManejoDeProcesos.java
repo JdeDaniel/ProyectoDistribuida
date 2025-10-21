@@ -18,84 +18,78 @@ public class ManejoDeProcesos extends Thread {
     // Si mantienes el “buffer de admisión”, documenta:
     private int bufferCap = 10;   // capacidad total de t admitidos
     private int bufferUsed = 0;   // t admitido acumulado
-
+    
+   
     private int tick = 0;
     private volatile boolean ejecutando = true;
 
-    // --- admisión FIFO ---
-    public void Espera() {
-        Proceso p = procesos.poll();
-        if (p == null) return;
-
-        // Si ya traía C, respétalo; si no, asígnalo al llegar
-        if (p.getCreacion() == null) p.setCreacion(tick);
-
-        // Si usas buffer de admisión
-        if (bufferCap - bufferUsed >= p.getDuracion()) {
-            enEspera.offer(p);
-            bufferUsed += p.getDuracion();
-            System.out.println("Admitido " + p.getNombre() + " en C=" + p.getCreacion());
-        } else {
-            rechazados.offer(p);
-            System.out.println("Rechazado " + p.getNombre() + " en tick " + tick);
-        }
-    }
-
-
-    // --- reintento de rechazados cada 3 ticks ---
-    private int contadorRechazo = 0;
-    public void Rechazo() {
-        if (rechazados.isEmpty()) return;
-        if (++contadorRechazo < 3) return;
-        contadorRechazo = 0;
-
-        Proceso p = rechazados.peek();
-        if (p == null) return;
-
-        if (bufferCap - bufferUsed >= p.getDuracion()) {
-            rechazados.poll();
-            // reingreso: C debe ser el instante de admisión real
-            p.setCreacion(tick);
-            enEspera.offer(p);
-            bufferUsed += p.getDuracion();
-            System.out.println("Reingresado " + p.getNombre() + " en C=" + p.getCreacion());
-        } else {
-            if (p.getIntentos() >= 3) {
-                rechazados.poll();
-                System.out.println("Descartado definitivo " + p.getNombre());
+    // --- admisión FIFO en lote---
+    private void admitirPendientes() {
+        Proceso p;
+        while ((p = procesos.peek()) != null) {
+            if (bufferCap - bufferUsed >= p.getDuracion()) {
+                procesos.poll();
+                if (p.getCreacion() == null) p.setCreacion(tick);
+                enEspera.offer(p);
+                bufferUsed += p.getDuracion();
+                System.out.println("Admitido " + p.getNombre() + " en C=" + p.getCreacion());
             } else {
-                p.subirIntentos();
+                rechazados.offer(procesos.poll());
+                System.out.println("Rechazado " + p.getNombre() + " en tick " + tick);
             }
         }
     }
+
+
+    //Rechazos por lote
+    private int contadorRechazo = 0;
+    private void reintentarRechazados() {
+        if (++contadorRechazo < 3) return;
+        contadorRechazo = 0;
+        while (!rechazados.isEmpty()) {
+            Proceso p = rechazados.peek();
+            if (bufferCap - bufferUsed >= p.getDuracion()) {
+                rechazados.poll();
+                p.setCreacion(tick);
+                enEspera.offer(p);
+                bufferUsed += p.getDuracion();
+                System.out.println("Reingresado " + p.getNombre() + " en C=" + p.getCreacion());
+            } else {
+                if (p.getIntentos() >= 3) {
+                    rechazados.poll();
+                    System.out.println("Descartado definitivo " + p.getNombre());
+                } else {
+                    p.subirIntentos();
+                }
+                break; // no hay más cupo, sal
+            }
+        }
+    }
+
     
     // --- ejecución no expropiativa: uno a la vez ---
     private Proceso running = null;
 
-    public void Ejecucion() {
+    private void ejecutarUnTick() {
         if (running == null) {
             running = enEspera.peek();
-            if (running == null) return;
-
-            // Primera vez que corre
+            if (running == null) return; // CPU ociosa
             if (running.getInicio() == null) {
                 running.setInicio(tick);
                 running.setEnEspera(tick - running.getCreacion()); // E = S - C
-                System.out.println("Inicio " + running.getNombre() + " S=" + running.getInicio() + " E=" + running.getEnEspera());
+                System.out.println("Inicio " + running.getNombre() + " S=" + running.getInicio());
             }
         }
-
-        // Progreso: ejecutamos 1 unidad por tick
-        int ejecutado = tick - running.getInicio(); // tiempo ejecutado desde S
-        int restante = running.getDuracion() - ejecutado;
+        int ejecutado = tick - running.getInicio() + 1;   // consumimos esta unidad
+        int restante  = running.getDuracion() - ejecutado;
         System.out.println("Tick " + tick + " ejecutando " + running.getNombre() + " restante=" + Math.max(restante,0));
-
         if (restante <= 0) {
-            Terminado(running);
+            Terminado(running);     // F = t + E, P = F/t; libera bufferUsed
             enEspera.poll();
             running = null;
         }
     }
+
 
     // --- fin de proceso: calcula F, P coherentes y escribe archivos ---
     public void Terminado(Proceso p) {
@@ -128,6 +122,8 @@ public class ManejoDeProcesos extends Thread {
     }
     
     
+
+    
     // --- bucle principal ---
     @Override
     public void run() {
@@ -135,9 +131,9 @@ public class ManejoDeProcesos extends Thread {
         while (ejecutando) {
             try {
                 Thread.sleep(300);      // 1 tick
-                Espera();
-                Rechazo();
-                Ejecucion();
+                admitirPendientes();        // 1) llenar READY hasta bufferCap
+                reintentarRechazados();     // 2) reintentos cuando toque
+                ejecutarUnTick();           // 3) consumir 1 unidad de CPU
                 tick++;
 
                 if (procesos.isEmpty() && enEspera.isEmpty() && rechazados.isEmpty() && running == null) {

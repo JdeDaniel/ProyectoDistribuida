@@ -46,7 +46,6 @@ public class Cliente {
             for (Object s : lista) System.out.println("  " + s);
             
             
-
             // Loop de envío de procesos
             Scanner sc = new Scanner(System.in);
             System.out.println("Enter = enviar proceso, 'q' = salir");

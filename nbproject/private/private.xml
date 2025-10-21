@@ -5,6 +5,8 @@
         <group>
             <file>file:/home/mimas/NetBeansProjects/ProyectoDistribuida/src/proyectodistribuida/Servidor.java</file>
             <file>file:/home/mimas/NetBeansProjects/ProyectoDistribuida/src/proyectodistribuida/Cliente.java</file>
+            <file>file:/home/mimas/NetBeansProjects/ProyectoDistribuida/src/proyectodistribuida/ManejoDeProcesos.java</file>
+            <file>file:/home/mimas/NetBeansProjects/ProyectoDistribuida/src/proyectodistribuida/RegistroProceso.java</file>
             <file>file:/home/mimas/NetBeansProjects/ProyectoDistribuida/src/proyectodistribuida/RegistroCliente.java</file>
         </group>
     </open-files>
