@@ -18,6 +18,7 @@ public class ManejoDeProcesos extends Thread {
     private static int QuantusUsados = 0;
     private static int QuantuActual = 0;
     private static int IntentoRechazo = 0;
+    private boolean ejecutando = true; // Variable para controlar la ejecución del hilo
 
     public ManejoDeProcesos(){
 
@@ -146,7 +147,8 @@ public class ManejoDeProcesos extends Thread {
 
     @Override
     public void run(){
-        while(true){
+        ejecutando = true;
+        while(ejecutando){
             try {
                 Thread.sleep(2000); //Simulamos un quantum de 1 segundo
                 Espera(); //Llamamos al metodo de espera
@@ -156,6 +158,10 @@ public class ManejoDeProcesos extends Thread {
                 Ejecucion(); //Llamamos al metodo de ejecucion
                 Thread.sleep(500); //Pequeña pausa para simular el tiempo entre metodos
                 QuantuActual += 1; //Aumentamos el contador de quantums
+                if(Procesos.isEmpty() && EnEspera.isEmpty() && Rechazados.isEmpty()){
+                    System.out.println("No hay procesos pendientes. Manejo de procesos se detiene.");
+                    ejecutando = false; //Detenemos el hilo si no hay procesos pendientes
+                }
             } catch (InterruptedException e) {
                 e.printStackTrace();
             }
