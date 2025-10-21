@@ -9,165 +9,155 @@ import java.util.concurrent.ConcurrentLinkedQueue;
 
 public class ManejoDeProcesos extends Thread {
     
-    //private static Queue<Proceso> EnEspera = new LinkedList<>();
-    private static Queue<Proceso> EnEspera = new ConcurrentLinkedQueue<>();
-    private static Queue<Proceso> Rechazados = new LinkedList<>();
-    private static Queue <Proceso> Procesos = new LinkedList<>();
-    //private Queue <Proceso> Ejecucion = new LinkedList<>();
-    private static int QuantusPosibles = 10;
-    private static int QuantusUsados = 0;
-    private static int QuantuActual = 0;
-    private static int IntentoRechazo = 0;
-    private boolean ejecutando = true; // Variable para controlar la ejecución del hilo
+    // Reemplaza campos estáticos por de instancia (mejor) o usa todos ConcurrentLinkedQueue
+    private final Queue<Proceso> enEspera = new ConcurrentLinkedQueue<>();
+    private final Queue<Proceso> rechazados = new ConcurrentLinkedQueue<>();
+    private final Queue<Proceso> procesos = new ConcurrentLinkedQueue<>();
+    
 
-    public ManejoDeProcesos(){
+    // Si mantienes el “buffer de admisión”, documenta:
+    private int bufferCap = 10;   // capacidad total de t admitidos
+    private int bufferUsed = 0;   // t admitido acumulado
 
-    }
+    private int tick = 0;
+    private volatile boolean ejecutando = true;
 
-    /*
-    public synchronized void IngresarProceso(int Duracion, String Nombre, String Cliente){
-        Proceso nuevoProceso = new Proceso(Duracion, Nombre, Cliente);
-        Procesos.offer(nuevoProceso);
-    }
-    */
+    // --- admisión FIFO ---
+    public void Espera() {
+        Proceso p = procesos.poll();
+        if (p == null) return;
 
-    public void actualizarProcesos(Queue<Proceso> nuevosProcesos){
-        Procesos = nuevosProcesos;
-    }
+        // Si ya traía C, respétalo; si no, asígnalo al llegar
+        if (p.getCreacion() == null) p.setCreacion(tick);
 
-    //Metodo que se llamara cada quantum para actualizar los procesos en espera
-    public void Espera(){
-        if(Procesos.isEmpty()){ //No hay procesos nuevos
-            return;
-        }
-        Proceso procesoActual = (Proceso) Procesos.poll(); //Obtenemos el proceso al frente de la cola
-        if(QuantusPosibles - QuantusUsados >= procesoActual.getDuracion()){ //Si hay espacio para el proceso entra a espera
-            System.out.println("Proceso " + procesoActual.getNombre() + " ha entrado en espera en el quantum " + QuantuActual);
-            procesoActual.setCreacion(QuantuActual);
-            EnEspera.offer(procesoActual);
-            QuantusUsados += procesoActual.getDuracion();
-        } else { //Si no hay espacio se rechaza el 
-            System.out.println("Proceso " + procesoActual.getNombre() + " ha sido rechazado en el quantum " + QuantuActual);
-            Rechazados.offer(procesoActual);
+        // Si usas buffer de admisión
+        if (bufferCap - bufferUsed >= p.getDuracion()) {
+            enEspera.offer(p);
+            bufferUsed += p.getDuracion();
+            System.out.println("Admitido " + p.getNombre() + " en C=" + p.getCreacion());
+        } else {
+            rechazados.offer(p);
+            System.out.println("Rechazado " + p.getNombre() + " en tick " + tick);
         }
     }
 
-    //Metodo que se llamara cada quantum para revisar los procesos rechazados
-    public void Rechazo(){
-        if(!Rechazados.isEmpty()){ //Si hay procesos rechazados
-            IntentoRechazo++; //Aumentamos el contador de tiempo para reintento
-            if(IntentoRechazo >= 3){ 
-                IntentoRechazo = 0; //Reiniciamos el contador
 
-                Proceso procesoRechazado = (Proceso) Rechazados.peek(); //Obtenemos el proceso rechazado al frente de la cola
-                if (QuantusPosibles - QuantusUsados > procesoRechazado.getDuracion()){ //Si hay espacio para el proceso entra a espera 
-                    System.out.println("Proceso " + procesoRechazado.getNombre() + " ha entrado en espera en el quantum " + QuantuActual);     
-                    procesoRechazado.setCreacion(QuantuActual);
-                    EnEspera.offer(procesoRechazado);
-                    QuantusUsados += procesoRechazado.getDuracion();
-                    Rechazados.poll(); //Removemos el proceso de la cola de rechazados
-                }else{
-                    if(procesoRechazado.getIntentos() >= 3){ //Si ya se ha intentado 3 veces se elimina el proceso
-                        System.out.println("Proceso " + procesoRechazado.getNombre() + " ha sido rechazado en el quantum " + QuantuActual);
-                        Rechazados.poll();
-                    } else {
-                        procesoRechazado.subirIntentos(); //Aumentamos el contador de intentos del proceso
-                    }
-                }
+    // --- reintento de rechazados cada 3 ticks ---
+    private int contadorRechazo = 0;
+    public void Rechazo() {
+        if (rechazados.isEmpty()) return;
+        if (++contadorRechazo < 3) return;
+        contadorRechazo = 0;
+
+        Proceso p = rechazados.peek();
+        if (p == null) return;
+
+        if (bufferCap - bufferUsed >= p.getDuracion()) {
+            rechazados.poll();
+            // reingreso: C debe ser el instante de admisión real
+            p.setCreacion(tick);
+            enEspera.offer(p);
+            bufferUsed += p.getDuracion();
+            System.out.println("Reingresado " + p.getNombre() + " en C=" + p.getCreacion());
+        } else {
+            if (p.getIntentos() >= 3) {
+                rechazados.poll();
+                System.out.println("Descartado definitivo " + p.getNombre());
+            } else {
+                p.subirIntentos();
             }
         }
     }
     
-    //Metodo que se llamara cada quantum para actualizar el avance de los procesos en Ejecucion
-    public void Ejecucion(){
-        if(QuantusUsados > 0){
-            System.out.println("Quantum " + QuantuActual + " en ejecucion. Quantus usados: " + QuantusUsados);
-            QuantusUsados -= 1; //Reducimos el uso de quantus por el proceso en ejecucion
-        }
+    // --- ejecución no expropiativa: uno a la vez ---
+    private Proceso running = null;
 
-        if(EnEspera.isEmpty()){ //No hay procesos en espera
-            return;
-        }
+    public void Ejecucion() {
+        if (running == null) {
+            running = enEspera.peek();
+            if (running == null) return;
 
-        Proceso procesoEjecucion = (Proceso) EnEspera.peek(); //Obtenemos el proceso al frente de la cola
-        if(procesoEjecucion.getEnEspera() != null){
-            System.out.println("Ejecutando proceso: " + procesoEjecucion.getNombre() + ", Duracion restante: " + (procesoEjecucion.getDuracion() - (QuantuActual - procesoEjecucion.getEnEspera() + procesoEjecucion.getCreacion())) );
-        }
-        
-        if (procesoEjecucion.getEnEspera() == null){  //Si es la primera vez que se ejecuta el proceso 
-            System.out.println("Proceso " + procesoEjecucion.getNombre() + " ha comenzado su ejecucion en el quantum " + QuantuActual);
-            procesoEjecucion.setInicio(QuantuActual);
-            procesoEjecucion.setEnEspera(QuantuActual - procesoEjecucion.getCreacion()); //Calculamos el tiempo en espera
-
-        }
-        //System.out.println("Tiempo de ejecucion del proceso " + procesoEjecucion.getNombre() + ": " + (QuantuActual - (procesoEjecucion.getEnEspera() + procesoEjecucion.getCreacion())));
-        if(procesoEjecucion.getEnEspera() != null && (procesoEjecucion.getDuracion() == (QuantuActual - (procesoEjecucion.getEnEspera() + procesoEjecucion.getCreacion())))){ //Si el proceso ha terminado su duracion
-            System.out.println("Proceso " + procesoEjecucion.getNombre() + " ha terminado su ejecucion en el quantum " + QuantuActual);
-            Terminado(procesoEjecucion);
-        }
-
-    }
-
-    //Metodo que se llamara cuando un proceso haya terminado su ejecucion
-    public void Terminado(Proceso procesoFinalizado){
-        procesoFinalizado.setFinalizacion(QuantuActual); //Calculamos el tiempo de finalizacion
-        procesoFinalizado.setPenalizacion(procesoFinalizado.getFinalizacion()  / procesoFinalizado.getDuracion()); //Calculamos la penalizacion
-        System.out.println("Proceso " + procesoFinalizado.getNombre() + " ha terminado en el quantum " + QuantuActual);
-        String ruta = procesoFinalizado.getCliente() + "_procesos.txt"; // Ruta del archivo para el cliente
-        
-        try (BufferedWriter writer = new BufferedWriter(new FileWriter(ruta, true))) { // Escribimos el proceso en el archivo
-            writer.write("Proceso: " + procesoFinalizado.getNombre() + ", Duracion: " + procesoFinalizado.getDuracion() + ", Creacion: " + procesoFinalizado.getCreacion() + ", En Espera: " + procesoFinalizado.getEnEspera()+ ", Inicio: " + procesoFinalizado.getInicio() + ", Finalizacion: " + procesoFinalizado.getFinalizacion() + ", Penalizacion: " + procesoFinalizado.getPenalizacion() + "\n");
-            writer.flush();
-            writer.close();
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-
-        ruta = "Todos_procesos.txt"; // Ruta del archivo general
-
-        File archivo = new File(ruta);
-        if (!archivo.exists()) { // Si el archivo no existe, lo crea, aqui guardara todos los procesos
-            try {
-                archivo.createNewFile();
-            } catch (Exception e) {
-                e.printStackTrace();
+            // Primera vez que corre
+            if (running.getInicio() == null) {
+                running.setInicio(tick);
+                running.setEnEspera(tick - running.getCreacion()); // E = S - C
+                System.out.println("Inicio " + running.getNombre() + " S=" + running.getInicio() + " E=" + running.getEnEspera());
             }
         }
 
-        try (BufferedWriter writer = new BufferedWriter(new FileWriter(ruta, true))) { // Escribimos el proceso en el archivo general
-            writer.write("Proceso: " + procesoFinalizado.getCliente() + "_" + procesoFinalizado.getNombre() + ", Duracion: " + procesoFinalizado.getDuracion() + ", Creacion: " + procesoFinalizado.getCreacion() + ", En Espera: " + procesoFinalizado.getEnEspera() + ", Inicio: " + procesoFinalizado.getInicio() + ", Finalizacion: " + procesoFinalizado.getFinalizacion() + ", Penalizacion: " + procesoFinalizado.getPenalizacion() + "\n");
-            writer.flush();
-            writer.close();
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
+        // Progreso: ejecutamos 1 unidad por tick
+        int ejecutado = tick - running.getInicio(); // tiempo ejecutado desde S
+        int restante = running.getDuracion() - ejecutado;
+        System.out.println("Tick " + tick + " ejecutando " + running.getNombre() + " restante=" + Math.max(restante,0));
 
-        EnEspera.poll(); //Removemos el proceso de la cola de espera
+        if (restante <= 0) {
+            Terminado(running);
+            enEspera.poll();
+            running = null;
+        }
     }
 
+    // --- fin de proceso: calcula F, P coherentes y escribe archivos ---
+    public void Terminado(Proceso p) {
+        // E ya está; F = t + E; P = F / t
+        int E = p.getEnEspera();
+        int F = p.getDuracion() + E;
+        p.setFinalizacion(F);
+        p.setPenalizacion((double) F / (double) p.getDuracion());
+
+        // liberar del buffer de admisión (si lo usas)
+        bufferUsed -= p.getDuracion();
+        if (bufferUsed < 0) bufferUsed = 0;
+
+        String linea = String.format(
+            "Proceso: %s, Duracion: %d, Creacion: %d, En Espera: %d, Inicio: %d, Finalizacion: %d, Penalizacion: %.2f, Cliente: %s%n",
+            p.getNombre(), p.getDuracion(), p.getCreacion(), p.getEnEspera(),
+            p.getInicio(), p.getFinalizacion(), p.getPenalizacion(), p.getCliente()
+        );
+
+        escribirLinea(p.getCliente() + "_procesos.txt", linea);
+        escribirLinea("Todos_procesos.txt", linea);
+        System.out.println("Terminado " + p.getNombre() + " F=" + F + " P=" + String.format("%.2f", p.getPenalizacion()));
+    }
+
+    private void escribirLinea(String ruta, String linea){
+        try (BufferedWriter w = new BufferedWriter(new FileWriter(ruta, true))) {
+            w.write(linea);
+            w.flush();
+        } catch (Exception e) { e.printStackTrace(); }
+    }
+    
+    
+    // --- bucle principal ---
     @Override
-    public void run(){
+    public void run() {
         ejecutando = true;
-        while(ejecutando){
+        while (ejecutando) {
             try {
-                Thread.sleep(2000); //Simulamos un quantum de 1 segundo
-                Espera(); //Llamamos al metodo de espera
-                Thread.sleep(500); //Pequeña pausa para simular el tiempo entre metodos
-                Rechazo(); //Llamamos al metodo de rechazo
-                Thread.sleep(500); //Pequeña pausa para simular el tiempo entre metodos
-                Ejecucion(); //Llamamos al metodo de ejecucion
-                Thread.sleep(500); //Pequeña pausa para simular el tiempo entre metodos
-                QuantuActual += 1; //Aumentamos el contador de quantums
-                if(Procesos.isEmpty() && EnEspera.isEmpty() && Rechazados.isEmpty()){
-                    System.out.println("No hay procesos pendientes. Manejo de procesos se detiene.");
-                    ejecutando = false; //Detenemos el hilo si no hay procesos pendientes
-                }
-            } catch (InterruptedException e) {
-                e.printStackTrace();
-            }
+                Thread.sleep(300);      // 1 tick
+                Espera();
+                Rechazo();
+                Ejecucion();
+                tick++;
 
+                if (procesos.isEmpty() && enEspera.isEmpty() && rechazados.isEmpty() && running == null) {
+                    ejecutando = false;
+                }
+            } catch (InterruptedException e) { Thread.currentThread().interrupt(); }
         }
     }
     
 
+    // API de entrada
+    public void actualizarProcesos(Queue<Proceso> nuevos){
+        procesos.clear();
+        procesos.addAll(nuevos);
+    }
+    
+    public void submit(Proceso p) {
+        // solo encola para admisión; C se fija al admitir
+        // usa la cola 'procesos' de instancia (no estática)
+        procesos.offer(p);
+    }
+    
 }

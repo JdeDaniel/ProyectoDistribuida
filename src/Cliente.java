@@ -1,55 +1,100 @@
-import org.apache.xmlrpc.client.XmlRpcClient;   // Importa la clase que permite crear un cliente XML-RPC para enviar peticiones al servidor
-import org.apache.xmlrpc.client.XmlRpcClientConfigImpl; // Importa la clase para configurar las opciones del cliente XML-RPC, como la URL del servidor
-
+import org.apache.xmlrpc.client.XmlRpcClient;
+import org.apache.xmlrpc.client.XmlRpcClientConfigImpl;
 import java.net.URI;
-//import java.net.URL;   // Importa la clase URL que representa la dirección a la cual el cliente se conectará
-import java.util.Arrays;    // Importa la clase Arrays para trabajar con arreglos, útil para pasar parámetros o manipular datos
+import java.util.Scanner;
+import java.nio.file.*;
+import java.io.*;
+import java.util.Properties;
 
 public class Cliente {
     public static int ProcesoID = 0;
-    
+    private static final Path CONF = Paths.get(System.getProperty("user.home"), ".ProyectoDistribuida.properties");
+
     public static void main(String[] args) {
         try {
-            String NombreCliente = "ClienteA";
+            String url = (args.length > 0) ? args[0] : "http://127.0.0.1:8080/";
 
-            // Configuración del cliente XML-RPC
+            // Config XML-RPC
             XmlRpcClientConfigImpl config = new XmlRpcClientConfigImpl();
-            URI uri = new URI("http://192.168.1.68:8080/");  // URL del servidor XML-RPC
-            config.setServerURL(uri.toURL()); 
-            config.setEnabledForExtensions(true); // Permite valores null
-
-            
-
-            //config.setBasicUserName(NombreCliente); // Nombre de usuario para autenticación básica");
-
-
-            // Creación del cliente XML-RPC
+            config.setServerURL(new URI(url).toURL());
+            config.setEnabledForExtensions(true);
             XmlRpcClient client = new XmlRpcClient();
             client.setConfig(config);
 
-            // Registro del cliente en el servidor
-            Object[] param = new Object[]{NombreCliente}; // Parámetros para el método remoto
-            client.execute("Servidor.registrarCliente", param); // Llamada para registrar el cliente
+            // Cargar estado local
+            Properties props = loadProps();
+            String clientId = props.getProperty("clientId");
+            String nombreCliente = props.getProperty("name");
 
-            while (true) {
-                System.out.println("Presione Enter para enviar un nuevo proceso al servidor o 'q' para salir...");
-                String entrada = System.console().readLine();
-                if (entrada.equalsIgnoreCase("q")) {
-                    System.out.println("Saliendo del cliente.");
-                    break;
-                }
-                ProcesoID++;
-                String NombreProceso = "Proceso" + ProcesoID;
-                int Duracion = (int) (Math.random() * 5) + 1; // Duración aleatoria entre 1 y 10
-                System.out.println("Enviando " + NombreProceso + " con duración " + Duracion + " al servidor...");
-                Object[] params = new Object[]{Duracion, NombreProceso, NombreCliente}; // Parámetros para el método remoto
-                client.execute("Manejador.IngresarProceso", Arrays.asList(params)); // Llamada al método remoto
-                
+            // Registrar si no existe
+            if (clientId == null || clientId.isEmpty()) {
+                nombreCliente = pedirNombreInteractivo();
+                clientId = (String) client.execute("Registro.registrar", new Object[]{ nombreCliente });
+
+                props.setProperty("clientId", clientId);
+                props.setProperty("name", nombreCliente);
+                saveProps(props);
+
+                System.out.println("Registrado con id: " + clientId + " nombre: " + nombreCliente);
+            } else {
+                System.out.println("Sesión previa: id=" + clientId + " nombre=" + nombreCliente);
             }
 
+            // Mostrar conectados (opcional)
+            Object[] lista = (Object[]) client.execute("Registro.listar", new Object[]{});
+            System.out.println("Conectados:");
+            for (Object s : lista) System.out.println("  " + s);
+            
+            
+
+            // Loop de envío de procesos
+            Scanner sc = new Scanner(System.in);
+            System.out.println("Enter = enviar proceso, 'q' = salir");
+            while (true) {
+                String entrada = sc.nextLine().trim();
+                if (entrada.equalsIgnoreCase("q")) break;
+
+                ProcesoID++;
+                String nombreProceso = "Proceso " + ProcesoID;
+                int duracion = 1 + (int)(Math.random() * 10); // 1..10
+
+                System.out.println("Enviando " + nombreProceso + " t=" + duracion);
+                Object[] params = new Object[]{ duracion, nombreProceso, nombreCliente };
+                client.execute("Manejador.IngresarProceso", params);
+            }
+            sc.close();
+
         } catch (Exception e) {
-            e.printStackTrace(); // Mane
+            e.printStackTrace();
         }
     }
-    
+
+    // Pide y valida nombre (1–20 chars)
+    private static String pedirNombreInteractivo() {
+        Scanner sc = new Scanner(System.in);
+        while (true) {
+            System.out.print("Elige tu nombre (1–20 caracteres): ");
+            String s = sc.nextLine().trim();
+            if (s.isEmpty()) { System.out.println("No puede estar vacío."); continue; }
+            if (s.length() > 20) { System.out.println("Máximo 20 caracteres."); continue; }
+            return s;
+        }
+    }
+
+    private static Properties loadProps() {
+        Properties p = new Properties();
+        if (Files.exists(CONF)) {
+            try (InputStream in = Files.newInputStream(CONF)) { p.load(in); }
+            catch (IOException ignored) {}
+        }
+        return p;
+    }
+
+    private static void saveProps(Properties p) {
+        try (OutputStream out = Files.newOutputStream(CONF)) {
+            p.store(out, "ProyectoDistribuida cliente");
+        } catch (IOException e) {
+            System.err.println("No se pudo guardar configuración: " + e.getMessage());
+        }
+    }
 }

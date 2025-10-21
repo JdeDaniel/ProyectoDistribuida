@@ -1,20 +1,13 @@
 import java.util.LinkedList;
 import java.util.Queue;
 
-
 public class RegistroProceso {
-    
-    private static Queue <Proceso> Procesos = new LinkedList<>();
-    private ManejoDeProcesos manejo = new ManejoDeProcesos();
+    public RegistroProceso(){}
 
-    public RegistroProceso(){
-
-    }
-
+    // RPC: Manejador.IngresarProceso(int Duracion, String Nombre, String Cliente)
     public synchronized void IngresarProceso(int Duracion, String Nombre, String Cliente){
-        Proceso nuevoProceso = new Proceso(Duracion, Nombre, Cliente);
-        Procesos.offer(nuevoProceso);
-        manejo.actualizarProcesos(Procesos);
+        Proceso p = new Proceso(Duracion, Nombre, Cliente);
+        // No setees C aquí; se asigna al admitir (tick actual) en ManejoDeProcesos
+        Servidor.getScheduler().submit(p);
     }
-
 }

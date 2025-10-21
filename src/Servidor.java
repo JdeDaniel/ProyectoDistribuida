@@ -1,125 +1,115 @@
 import java.util.HashSet;
 import java.util.Set;
+import java.util.Scanner;
+import javax.swing.SwingUtilities;
 
-import org.apache.xmlrpc.server.PropertyHandlerMapping; // Registra mapeos entre nombres de servicios (strings) y clases Java
-import org.apache.xmlrpc.server.XmlRpcServer; // Clase principal que maneja la lógica del servidor RPC basado en XML
-import org.apache.xmlrpc.webserver.WebServer; // Servidor web embebido simple que puede escuchar peticiones HTTP en un puerto específico
-import java.io.File;
-import org.apache.xmlrpc.XmlRpcConfigImpl;
+import org.apache.xmlrpc.server.PropertyHandlerMapping;
+import org.apache.xmlrpc.server.XmlRpcServer;
 import org.apache.xmlrpc.server.XmlRpcServerConfigImpl;
+import org.apache.xmlrpc.webserver.WebServer;
 
-public class Servidor{
-    //private static final int PORT = 8080; // Puerto en el que el servidor escuchará las conexiones
-    private static Set<String> clientesRegistrados = new HashSet<>();
+import java.io.File;
 
-    public Servidor() {
-    }
+public class Servidor {
+    private static final Set<String> clientesRegistrados = new HashSet<>();
+    private static ManejoDeProcesos scheduler = new ManejoDeProcesos();
+
+    public static ManejoDeProcesos getScheduler() { return scheduler; }
+    public Servidor() {}
 
     public void registrarCliente(String nombreCliente) {
-        if(clientesRegistrados.contains(nombreCliente)) {
-            return; // El cliente ya está registrado
-        }
-        clientesRegistrados.add(nombreCliente);
-        String ruta = nombreCliente + "_procesos.txt"; // Ruta del archivo para el cliente
-        File archivo = new File(ruta);
-        if (!archivo.exists()) { // Si el archivo no existe, lo crea, aqui guardara los procesos del cliente
-            try {
-                archivo.createNewFile();
-            } catch (Exception e) {
-                e.printStackTrace();
-            }
-        }
+        if (!clientesRegistrados.add(nombreCliente)) return;
+        File f = new File(nombreCliente + "_procesos.txt");
+        try { if (!f.exists()) f.createNewFile(); } catch (Exception e) { e.printStackTrace(); }
     }
 
-    //Metodo que se llamara cuando un el servidor se cierre
-    private static void Cierre() {
+    private static void cierreLimpio(WebServer webServer, Scanner sc) {
+        try { if (sc != null) sc.close(); } catch (Exception ignore) {}
         for (String cliente : clientesRegistrados) {
-            String ruta = cliente + "_procesos.txt";
-            File fichero = new File(ruta);
-
-            if (!fichero.delete())
-                System.out.println("El fichero " + ruta + " no pudó ser borrado");
+            File f = new File(cliente + "_procesos.txt");
+            if (!f.delete()) System.out.println("No se pudo borrar " + f.getName());
         }
-        File fichero = new File("Todos_procesos.txt");
-        if (!fichero.delete())
-            System.out.println("El fichero Todos_procesos.txt no pudó ser borrado");
+        File g = new File("Todos_procesos.txt");
+        if (!g.delete()) System.out.println("No se pudo borrar " + g.getName());
+        try { if (webServer != null) webServer.shutdown(); } catch (Exception ignore) {}
     }
 
-    public static void main(String[] args) throws Exception {
+    public static void main(String[] args) {
+        final int PORT = 8080;
+        WebServer webServer = null;
+        Scanner sc = new Scanner(System.in);
 
-        try{
-            int PORT = 8080; // Puerto en el que el servidor escuchará las conexiones
-            Graficas grafica;
-            ManejoDeProcesos manejo = new ManejoDeProcesos();
-
-            System.out.println("Iniciando servidor XML-RPC en el puerto " + PORT + "...");
-
-            // Crea un nuevo servidor web que escuchará en el puerto especificado
-            WebServer webServer = new WebServer(PORT);
-            // Obtiene la instancia del servidor XML-RPC asociado con el servidor web
+        try {
+            System.out.println("Iniciando servidor XML-RPC en el puerto " + PORT + "…");
+            webServer = new WebServer(PORT);
             XmlRpcServer xmlRpcServer = webServer.getXmlRpcServer();
-            XmlRpcServerConfigImpl serverConfig = (XmlRpcServerConfigImpl) xmlRpcServer.getConfig();
-            serverConfig.setEnabledForExtensions(true); //Permite valores null
-            serverConfig.setContentLengthOptional(false);
+            XmlRpcServerConfigImpl cfg = (XmlRpcServerConfigImpl) xmlRpcServer.getConfig();
+            cfg.setEnabledForExtensions(true);
+            cfg.setContentLengthOptional(false);
 
-            // Crea un mapeo de manejadores para registrar las clases que contendrán los métodos RPC
             PropertyHandlerMapping phm = new PropertyHandlerMapping();
-            phm.setVoidMethodEnabled(true); // Permite métodos que no retornan valor
-
-            // Registra la clase 'Servidor' bajo el nombre 'MiServidor'.
-            // Esto significa que los métodos públicos de la clase 'Servidor' podrán ser invocados remotamente
-            // prefijando el nombre del método con "MiServidor.". Por ejemplo, "MiServidor.sumar".
+            phm.setVoidMethodEnabled(true);
             phm.addHandler("Servidor", Servidor.class);
             phm.addHandler("Manejador", RegistroProceso.class);
-            //phm.addHandler("Proceso", Proceso.class);
-            // Establece el mapeo de manejadores en el servidor XML-RPC
+            phm.addHandler("Registro", RegistroCliente.class);
+            phm.addHandler("Proceso",  Proceso.class);
             xmlRpcServer.setHandlerMapping(phm);
 
-            // Inicia el servidor web, haciéndolo disponible para recibir peticiones
+            // Opcional: deja SOLO uno, hook o finally. Mantengo finally y comento hook.
+            // WebServer finalWeb = webServer;
+            // Runtime.getRuntime().addShutdownHook(new Thread(() -> cierreLimpio(finalWeb, null)));
+
             webServer.start();
+            System.out.println("Servidor iniciado. Esperando peticiones…");
 
-            System.out.println("Servidor iniciado exitosamente. Esperando peticiones...");
-
-            while (true) {
-                System.out.println("Menu del servidor:");
-                System.out.println("1. Imprimir Procesos de clientes");
-                System.out.println("2. Comenzar Manejo de Procesos");
-                System.out.println("3. Cerrar servidor");
-                System.out.print("Seleccione una opción: ");
-                int opcion = new java.util.Scanner(System.in).nextInt();
-                switch (opcion) {
-                    case 1:
-                        //Opcion: Mostrar graficas de los procesos
-                        String ruta = "Todos_procesos.txt";
-                        grafica = new Graficas(ruta);
-                        grafica.mostrar(ruta);
-                        break;
-                    case 2:
-                        System.out.println("Comenzando manejo de procesos...");
-                        manejo.run();
-                        break;
-                    case 3:
-                        System.out.println("Cerrando servidor...");
-                        Cierre();
-                        webServer.shutdown();
-                        System.out.println("Servidor cerrado.");
-                        System.exit(0);
-                        break; 
+            boolean loop = true;
+            while (loop) {
+                try {
+                    mostrarMenu();
+                    int opcion = Integer.parseInt(sc.nextLine().trim());
+                    switch (opcion) {
+                        case 1 -> {
+                            String ruta = "Todos_procesos.txt";
+                            SwingUtilities.invokeLater(() -> Graficas.mostrar(ruta));
+                            esperarEnter(sc, "Pulsa ENTER para volver al menú...");
+                        }
+                        case 2 -> {
+                            if (!scheduler.isAlive()) {
+                                System.out.println("============ Iniciando planificador FIFO ============");
+                                scheduler.start();
+                            } else {
+                                System.out.println("Planificador ya está corriendo.");
+                            }
+                            esperarEnter(sc, "Pulsa ENTER para volver al menú...");
+                        }
+                        case 3 -> {
+                            System.out.println("Cerrando servidor…");
+                            loop = false;
+                        }
+                        default -> System.out.println("Opción inválida.");
+                    }
+                } catch (NumberFormatException e) {
+                    System.out.println("Entrada no válida.");
                 }
             }
         } catch (Exception e) {
             System.err.println("Error en el servidor: " + e.getMessage());
+        } finally {
+            cierreLimpio(webServer, sc);
+            System.out.println("Servidor cerrado.");
         }
-        
-            
-        /*
-        Opcion: Mostrar graficas de los procesos
-        String ruta = "Todos_procesos.txt";
-        mostrar(ruta); 
-        */
-
     }
 
-    
-    
+    private static void mostrarMenu() {
+        System.out.println("\nMenú del servidor:");
+        System.out.println("1. Mostrar gráficas");
+        System.out.println("2. Comenzar manejo de procesos");
+        System.out.println("3. Cerrar servidor");
+        System.out.print("Opción: ");
+    }
+
+    private static void esperarEnter(Scanner sc, String msg) {
+        System.out.print(msg);
+        sc.nextLine();
+    }
 }
