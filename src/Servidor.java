@@ -78,6 +78,7 @@ public class Servidor {
                             
                             
                             SwingUtilities.invokeLater(() -> Graficas.mostrar(ruta));
+                            SwingUtilities.invokeLater(() -> VentanaTablas.mostrar(ruta));
                             esperarEnter(sc, "Pulsa ENTER para volver al menú...");
                         }
                         case 2 -> {
