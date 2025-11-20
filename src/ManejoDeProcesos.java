@@ -1,5 +1,7 @@
 import java.util.LinkedList;
 import java.util.Queue;
+import java.util.List;
+import java.util.ArrayList;
 import java.io.FileWriter;
 import java.io.BufferedWriter;
 import java.io.File;
@@ -166,5 +168,19 @@ public class ManejoDeProcesos extends Thread {
         // usa la cola 'procesos' de instancia (no estática)
         procesos.offer(p);
     }
+    
+    // --- getters para UI / monitorización ---
+    public List<Proceso> getEnEsperaSnapshot() {
+        return new ArrayList<>(enEspera);
+    }
+
+    public List<Proceso> getRechazadosSnapshot() {
+        return new ArrayList<>(rechazados);
+    }
+
+    public int getTick() { return tick; }
+    
+    // Devuelve el proceso en ejecución (si hay)
+    public Proceso getRunning() { return running; }
     
 }

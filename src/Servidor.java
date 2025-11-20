@@ -85,6 +85,8 @@ public class Servidor {
                             if (!scheduler.isAlive()) {
                                 System.out.println("============ Iniciando planificador FIFO ============");
                                 scheduler.start();
+                                // Mostrar ventana de colas en tiempo real
+                                VentanaColas.mostrar(scheduler);
                             } else {
                                 System.out.println("Planificador ya está corriendo.");
                             }
