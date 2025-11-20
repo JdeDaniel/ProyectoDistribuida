@@ -25,17 +25,28 @@ public class ManejoDeProcesos extends Thread {
 
     // --- admisión FIFO en lote---
     private void admitirPendientes() {
-        Proceso p;
-        while ((p = procesos.peek()) != null) {
+        // Solo intentar admitir procesos cuyo "inicioDeseado" sea <= tick (o nulo)
+        for (Proceso p : procesos) {
+            Integer inicioDeseado = p.getInicioDeseado();
+            if (inicioDeseado != null && tick < inicioDeseado) {
+                // Aún no es su tick; saltar
+                continue;
+            }
+            // Intentar admitir este proceso
             if (bufferCap - bufferUsed >= p.getDuracion()) {
-                procesos.poll();
-                if (p.getCreacion() == null) p.setCreacion(tick);
-                enEspera.offer(p);
-                bufferUsed += p.getDuracion();
-                System.out.println("Admitido " + p.getNombre() + " en C=" + p.getCreacion());
+                // remover y admitir
+                if (procesos.remove(p)) {
+                    if (p.getCreacion() == null) p.setCreacion(tick);
+                    enEspera.offer(p);
+                    bufferUsed += p.getDuracion();
+                    System.out.println("Admitido " + p.getNombre() + " en C=" + p.getCreacion());
+                }
             } else {
-                rechazados.offer(procesos.poll());
-                System.out.println("Rechazado " + p.getNombre() + " en tick " + tick);
+                // remover de cola de admisión y pasar a rechazados
+                if (procesos.remove(p)) {
+                    rechazados.offer(p);
+                    System.out.println("Rechazado " + p.getNombre() + " en tick " + tick);
+                }
             }
         }
     }

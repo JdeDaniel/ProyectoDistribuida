@@ -4,6 +4,7 @@ public class Proceso {
     private String cliente;     // opcional
     private int duracion;       // t
     private Integer creacion;   // C
+    private Integer inicioDeseado; // tick deseado para intentar ingreso (S_des)
 
     // Datos opcionales/medidos
     private Integer inicio;        // si no se setea, se calcula como C + E cuando E exista
@@ -21,8 +22,16 @@ public class Proceso {
         this.cliente = cliente;
     }
 
+    public Proceso(int duracion, String nombre, String cliente, Integer inicioDeseado){
+        this.duracion = duracion;
+        this.nombre = nombre;
+        this.cliente = cliente;
+        this.inicioDeseado = inicioDeseado;
+    }
+
     // ---------- Setters explícitos ----------
     public void setCreacion(int creacion){ this.creacion = creacion; }
+    public void setInicioDeseado(Integer inicioDeseado){ this.inicioDeseado = inicioDeseado; }
     public void setInicio(int inicio){ this.inicio = inicio; }
     public void setEnEspera(int enEspera){ this.enEspera = enEspera; }
     public void setFinalizacion(int finalizacion){ this.finalizacion = finalizacion; }
@@ -39,6 +48,7 @@ public class Proceso {
     public Integer getFinalizacion(){ return finalizacion != null ? finalizacion : calcFinalizacion(); }
     public Double getPenalizacion(){ return penalizacion != null ? penalizacion : calcPenalizacion(); }
     public Integer getIntentos(){ return intentos; }
+    public Integer getInicioDeseado(){ return inicioDeseado; }
 
     // ---------- Cálculos coherentes ----------
     // E = Inicio - C

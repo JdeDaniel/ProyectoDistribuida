@@ -57,8 +57,21 @@ public class Cliente {
                 String nombreProceso = "Proceso " + ProcesoID;
                 int duracion = 1 + (int)(Math.random() * 10); // 1..10
 
-                System.out.println("Enviando " + nombreProceso + " t=" + duracion);
-                Object[] params = new Object[]{ duracion, nombreProceso, nombreCliente };
+                // Pedir tick de inicio deseado al usuario
+                Integer inicioDeseado = null;
+                while (inicioDeseado == null) {
+                    System.out.print("Tick inicio deseado (entero >=0, ENTER para 0): ");
+                    String s = sc.nextLine().trim();
+                    if (s.isEmpty()) { inicioDeseado = 0; break; }
+                    try {
+                        int v = Integer.parseInt(s);
+                        if (v < 0) { System.out.println("Debe ser >= 0."); continue; }
+                        inicioDeseado = v;
+                    } catch (NumberFormatException e) { System.out.println("Número inválido."); }
+                }
+
+                System.out.println("Enviando " + nombreProceso + " t=" + duracion + " startTick=" + inicioDeseado);
+                Object[] params = new Object[]{ duracion, nombreProceso, nombreCliente, inicioDeseado };
                 client.execute("Manejador.IngresarProceso", params);
             }
             sc.close();
