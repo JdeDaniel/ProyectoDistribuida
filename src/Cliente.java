@@ -55,7 +55,7 @@ public class Cliente {
 
                 ProcesoID++;
                 String nombreProceso = "Proceso " + ProcesoID;
-                int duracion = 1 + (int)(Math.random() * 10); // 1..10
+                int duracion = 1 + (int)(Math.random() * 5); // 1..10
 
                 // Pedir tick de inicio deseado al usuario
                 Integer inicioDeseado = null;

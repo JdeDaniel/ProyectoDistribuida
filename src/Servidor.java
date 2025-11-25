@@ -12,7 +12,7 @@ import java.io.File;
 
 public class Servidor {
     private static final Set<String> clientesRegistrados = new HashSet<>();
-    private static ManejoDeProcesos scheduler = new ManejoDeProcesos();
+    private static ManejoDeProcesos scheduler = null; // create only when starting
 
     public static ManejoDeProcesos getScheduler() { return scheduler; }
     public Servidor() {}
@@ -82,18 +82,48 @@ public class Servidor {
                             esperarEnter(sc, "Pulsa ENTER para volver al menú...");
                         }
                         case 2 -> {
-                            if (!scheduler.isAlive()) {
+                            // If scheduler is not running create and start a fresh instance.
+                            if (scheduler == null || !scheduler.isAlive()) {
                                 System.out.println("============ Iniciando planificador FIFO ============");
+                                scheduler = new ManejoDeProcesos();
                                 scheduler.start();
                                 // Mostrar ventana de colas en tiempo real
                                 VentanaColas.mostrar(scheduler);
+                                System.out.println("Planificador iniciado. Pulsa ENTER para detenerlo y volver al menú...");
+                                // Block until user presses ENTER; then shut down scheduler
+                                esperarEnter(sc, "Pulsa ENTER para detener el planificador y volver al menú...");
+                                try {
+                                    if (scheduler != null && scheduler.isAlive()) {
+                                        scheduler.shutdown();
+                                        scheduler.join(1000);
+                                        System.out.println("Planificador detenido.");
+                                    }
+                                } catch (InterruptedException ie) { Thread.currentThread().interrupt(); }
                             } else {
-                                System.out.println("Planificador ya está corriendo.");
+                                // scheduler already running - ask user to press ENTER to stop it
+                                System.out.println("Planificador ya está corriendo. Pulsa ENTER para detenerlo...");
+                                esperarEnter(sc, "Pulsa ENTER para detener el planificador y volver al menú...");
+                                try {
+                                    if (scheduler != null && scheduler.isAlive()) {
+                                        scheduler.shutdown();
+                                        scheduler.join(1000);
+                                        System.out.println("Planificador detenido.");
+                                    }
+                                } catch (InterruptedException ie) { Thread.currentThread().interrupt(); }
                             }
-                            esperarEnter(sc, "Pulsa ENTER para volver al menú...");
+                            // after stopping we keep scheduler reference (it can be restarted next time)
                         }
                         case 3 -> {
                             System.out.println("Cerrando servidor…");
+                            // request scheduler to stop and wait briefly
+                            try {
+                                if (scheduler != null && scheduler.isAlive()) {
+                                    scheduler.shutdown();
+                                    scheduler.join(1000);
+                                }
+                            } catch (InterruptedException ie) {
+                                Thread.currentThread().interrupt();
+                            }
                             loop = false;
                         }
                         default -> System.out.println("Opción inválida.");
@@ -105,6 +135,15 @@ public class Servidor {
         } catch (Exception e) {
             System.err.println("Error en el servidor: " + e.getMessage());
         } finally {
+            // ensure scheduler is stopped before exiting
+            try {
+                if (scheduler != null && scheduler.isAlive()) {
+                    scheduler.shutdown();
+                    scheduler.join(1000);
+                }
+            } catch (InterruptedException ie) {
+                Thread.currentThread().interrupt();
+            }
             cierreLimpio(webServer, sc);
             System.out.println("Servidor cerrado.");
         }

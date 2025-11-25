@@ -2,6 +2,8 @@ import javax.swing.*;
 import java.awt.*;
 import java.util.List;
 import java.util.ArrayList;
+import java.util.Map;
+import java.util.HashMap;
  
 
 public class VentanaColas extends JFrame {
@@ -16,7 +18,7 @@ public class VentanaColas extends JFrame {
     private final PanelColas panelColas;
 
     public VentanaColas(ManejoDeProcesos scheduler) {
-        super("Colas - Monitor en tiempo real");
+        super("Colas en tiempo real");
         this.scheduler = scheduler;
 
         setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
@@ -40,6 +42,26 @@ public class VentanaColas extends JFrame {
     }
 
     private class PanelColas extends JPanel {
+        // cache de colores por proceso, estable y determinista
+        private final Map<String,Color> colorCache = new HashMap<>();
+
+        private Color getColorForProcess(String name) {
+            return colorCache.computeIfAbsent(name, k -> {
+                int h = Math.abs(k.hashCode());
+                float hue = (h % 360) / 360f;
+                float sat = 0.68f;
+                float bri = 0.86f;
+                return Color.getHSBColor(hue, sat, bri);
+            });
+        }
+
+        private Color pickTextColor(Color bg) {
+            double r = bg.getRed();
+            double g = bg.getGreen();
+            double b = bg.getBlue();
+            double lum = (0.299 * r + 0.587 * g + 0.114 * b) / 255.0;
+            return lum > 0.6 ? Color.BLACK : Color.WHITE;
+        }
         @Override
         protected void paintComponent(Graphics g) {
             super.paintComponent(g);
@@ -51,7 +73,7 @@ public class VentanaColas extends JFrame {
             // Título
             g2.setFont(new Font("SansSerif", Font.BOLD, 16));
             g2.setColor(Color.BLACK);
-            g2.drawString("Monitor de colas (READY / RECHAZADOS)", MARGEN_IZQ, 20);
+            //g2.drawString("Monitor de colas (READY / RECHAZADOS)", MARGEN_IZQ, 20);
 
             int x0 = MARGEN_IZQ;
             // Dibujar la cuadrícula de tiempo (etiquetas y celdas) fija
@@ -66,12 +88,13 @@ public class VentanaColas extends JFrame {
             final int MAX_ROWS_READY = 1;
             final int MAX_ROWS_REJECT = 1;
             final int GAP_SECTION = 24;
-            int baseYReady = MARGEN_SUP;
+            final int VERTICAL_SHIFT = 28; // bajar ambas secciones un poco
+            int baseYReady = MARGEN_SUP + VERTICAL_SHIFT;
             int heightReady = MAX_ROWS_READY * (CELL_SIZE + GAP_FILAS);
             int baseYReject = baseYReady + heightReady + GAP_SECTION;
             int heightReject = MAX_ROWS_REJECT * (CELL_SIZE + GAP_FILAS);
 
-            // Dibujar líneas verticales de la cuadrícula para ambas secciones
+            // Dibujar líneas verticales de la cuadrícula para ambas secciones (mismas columnas)
             g2.setColor(new Color(200,200,200));
             for (int c = 0; c < WINDOW_CELLS; c++) {
                 int x = x0 + c * CELL_SIZE;
@@ -113,18 +136,19 @@ public class VentanaColas extends JFrame {
                 if (running != null && running == p && p.getInicio() != null) {
                     ejecutado = Math.max(0, tick - p.getInicio());
                 }
-                // colocamos el proceso de forma contigua en la siguiente celda disponible
-                for (int i = 0; i < dur; i++) {
+                // remanente (lo que queda por ejecutar) — esto hace que la barra "se mueva" hacia la izquierda
+                int rem = Math.max(0, dur - ejecutado);
+                // colocamos el proceso (las celdas restantes) de forma contigua en la siguiente celda disponible
+                Color baseColor = getColorForProcess(p.getNombre());
+                for (int i = 0; i < rem; i++) {
                     int cellIndex = cursorCell + i;
                     if (cellIndex >= 0 && cellIndex < WINDOW_CELLS) {
                         int x = x0 + cellIndex * CELL_SIZE;
-                        Color base = colorDeterminista(p.getNombre());
-                        if (i < ejecutado) base = base.darker();
-                        g2.setColor(base);
+                        g2.setColor(baseColor);
                         g2.fillRect(x+1, gy+1, CELL_SIZE-1, CELL_SIZE-1);
                         g2.setColor(Color.BLACK);
                         g2.drawRect(x, gy, CELL_SIZE, CELL_SIZE);
-                        g2.setColor(Color.WHITE);
+                        g2.setColor(pickTextColor(baseColor));
                         FontMetrics fm = g2.getFontMetrics();
                         String label = p.getNombre();
                         int tx = x + (CELL_SIZE - fm.stringWidth(label)) / 2;
@@ -132,7 +156,7 @@ public class VentanaColas extends JFrame {
                         g2.drawString(label, Math.max(tx, x+2), ty);
                     }
                 }
-                cursorCell += dur;
+                cursorCell += rem; // próximo proceso se pega tras las celdas restantes
                 if (cursorCell >= WINDOW_CELLS) break; // no hay más espacio visible
             }
 
@@ -144,39 +168,38 @@ public class VentanaColas extends JFrame {
             // Título sección RECHAZADOS
             g2.setColor(Color.BLACK);
             g2.drawString("RECHAZADOS", 10, baseYReject - 12);
-            int rowR = 0;
+            // Mostrar RECHAZADOS: dibujar la misma cuadrícula fija que READY, una fila
+            for (int c = 0; c < WINDOW_CELLS; c++) {
+                int gx = x0 + c * CELL_SIZE;
+                int gyRejectGrid = baseYReject;
+                g2.setColor(Color.WHITE);
+                g2.fillRect(gx, gyRejectGrid, CELL_SIZE, CELL_SIZE);
+                g2.setColor(new Color(200,200,200));
+                g2.drawRect(gx, gyRejectGrid, CELL_SIZE, CELL_SIZE);
+            }
+
+            // Mostrar RECHAZADOS en UNA fila, un recuadro por proceso, en orden FIFO y contiguos
+            int cursorR = 0;
+            int gyR = baseYReject; // una sola fila para rechazados
             for (Proceso p : rechazados) {
-                if (rowR >= MAX_ROWS_REJECT) break;
-                int inicioEstimado = (p.getInicioDeseado() != null) ? p.getInicioDeseado() : (p.getCreacion() != null ? p.getCreacion() : tick);
-                int dur = p.getDuracion();
-                int gyR = baseYReject + rowR * (CELL_SIZE + GAP_FILAS);
-                for (int i = 0; i < dur; i++) {
-                    int cellIndex = inicioEstimado - tick + i;
-                    int x = x0 + cellIndex * CELL_SIZE;
-                    if (cellIndex >= 0 && cellIndex < WINDOW_CELLS) {
-                        g2.setColor(new Color(200, 80, 80));
-                        g2.fillRect(x+1, gyR+1, CELL_SIZE-1, CELL_SIZE-1);
-                        g2.setColor(Color.BLACK);
-                        g2.drawRect(x, gyR, CELL_SIZE, CELL_SIZE);
-                        g2.setColor(Color.WHITE);
-                        FontMetrics fm = g2.getFontMetrics();
-                        String label = p.getNombre();
-                        int tx = x + (CELL_SIZE - fm.stringWidth(label)) / 2;
-                        int ty = gyR + (CELL_SIZE + fm.getAscent()) / 2 - 4;
-                        g2.drawString(label, Math.max(tx, x+2), ty);
-                    }
-                }
-                rowR++;
+                if (cursorR >= WINDOW_CELLS) break; // pantalla llena
+                int x = x0 + cursorR * CELL_SIZE;
+                Color cReject = getColorForProcess(p.getNombre());
+                g2.setColor(cReject);
+                g2.fillRect(x+1, gyR+1, CELL_SIZE-1, CELL_SIZE-1);
+                g2.setColor(Color.BLACK);
+                g2.drawRect(x, gyR, CELL_SIZE, CELL_SIZE);
+                g2.setColor(pickTextColor(cReject));
+                FontMetrics fm = g2.getFontMetrics();
+                String label = p.getNombre();
+                int tx = x + (CELL_SIZE - fm.stringWidth(label)) / 2;
+                int ty = gyR + (CELL_SIZE + fm.getAscent()) / 2 - 4;
+                g2.drawString(label, Math.max(tx, x+2), ty);
+                cursorR++;
             }
         }
 
-        private Color colorDeterminista(String s){
-            int h = s.hashCode();
-            int r = 50 + Math.floorMod(h, 156);
-            int g = 50 + Math.floorMod(h>>8, 156);
-            int b = 50 + Math.floorMod(h>>16, 156);
-            return new Color(r,g,b);
-        }
+        // (no longer needed: getColorForProcess provides deterministic vivid colours)
     }
 
     public static void mostrar(ManejoDeProcesos scheduler) {

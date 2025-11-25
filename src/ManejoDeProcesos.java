@@ -149,9 +149,10 @@ public class ManejoDeProcesos extends Thread {
                 ejecutarUnTick();           // 3) consumir 1 unidad de CPU
                 tick++;
 
+                /*
                 if (procesos.isEmpty() && enEspera.isEmpty() && rechazados.isEmpty() && running == null) {
                     ejecutando = false;
-                }
+                }*/
             } catch (InterruptedException e) { Thread.currentThread().interrupt(); }
         }
     }
@@ -182,5 +183,14 @@ public class ManejoDeProcesos extends Thread {
     
     // Devuelve el proceso en ejecución (si hay)
     public Proceso getRunning() { return running; }
+    
+    /**
+     * Request a shutdown of the scheduler loop and interrupt any sleep so the thread
+     * will exit promptly. Safe to call multiple times.
+     */
+    public void shutdown() {
+        ejecutando = false;
+        try { this.interrupt(); } catch (Exception ignore) {}
+    }
     
 }
