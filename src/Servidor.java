@@ -14,7 +14,18 @@ public class Servidor {
     private static final Set<String> clientesRegistrados = new HashSet<>();
     private static ManejoDeProcesos scheduler = null; // create only when starting
 
-    public static ManejoDeProcesos getScheduler() { return scheduler; }
+    public static synchronized ManejoDeProcesos getScheduler() {
+        if (scheduler == null) {
+            // If an RPC call arrives before the operator started the scheduler from the menu,
+            // create & start it automatically so RegistroProceso can submit processes.
+            scheduler = new ManejoDeProcesos();
+            scheduler.start();
+            // show the UI if possible
+            SwingUtilities.invokeLater(() -> VentanaColas.mostrar(scheduler));
+            System.out.println("Scheduler autocreated and started (via RPC).");
+        }
+        return scheduler;
+    }
     public Servidor() {}
 
     public void registrarCliente(String nombreCliente) {
@@ -56,8 +67,7 @@ public class Servidor {
             xmlRpcServer.setHandlerMapping(phm);
 
             // Opcional: deja SOLO uno, hook o finally. Mantengo finally y comento hook.
-            WebServer finalWeb = webServer;
-            // Runtime.getRuntime().addShutdownHook(new Thread(() -> cierreLimpio(finalWeb, null)));
+            // Runtime.getRuntime().addShutdownHook(new Thread(() -> cierreLimpio(webServer, null)));
             
             limpiarArchivos();
             

@@ -12,7 +12,7 @@ public class Cliente {
 
     public static void main(String[] args) {
         try {
-            String url = (args.length > 0) ? args[0] : "http://127.0.0.1:8080/";
+            String url = (args.length > 0) ? args[0] : "http://172.26.166.9:8080/";
 
             // Config XML-RPC
             XmlRpcClientConfigImpl config = new XmlRpcClientConfigImpl();
